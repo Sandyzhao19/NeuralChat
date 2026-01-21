@@ -33,7 +33,7 @@ export default async function handler(req, res) {
             return res.status(500).json({ error: 'API token not configured' });
         }
 
-        // Use Hugging Face Router API (new endpoint as of 2024)
+        // Use Hugging Face Router API v1 (OpenAI-compatible format)
         // Try multiple models in order of preference
         const models = [
             'Qwen/Qwen2.5-7B-Instruct',
@@ -49,15 +49,14 @@ export default async function handler(req, res) {
 
         for (const model of models) {
             try {
-                // Hugging Face Router API - note: no /models/ in path
+                // Use OpenAI-compatible chat completions endpoint
                 response = await fetch(
-                    `https://router.huggingface.co/${model}`,
+                    'https://api-inference.huggingface.co/models/' + model,
                     {
                         method: 'POST',
                         headers: {
                             'Authorization': `Bearer ${HF_API_TOKEN}`,
-                            'Content-Type': 'application/json',
-                            'x-wait-for-model': 'true'
+                            'Content-Type': 'application/json'
                         },
                         body: JSON.stringify({
                             inputs: prompt,
@@ -65,9 +64,12 @@ export default async function handler(req, res) {
                                 max_new_tokens: 512,
                                 temperature: 0.7,
                                 top_p: 0.9,
-                                do_sample: true,
                                 return_full_text: false,
                                 ...(parameters || {})
+                            },
+                            options: {
+                                use_cache: false,
+                                wait_for_model: true
                             }
                         })
                     }
