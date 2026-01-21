@@ -49,8 +49,9 @@ export default async function handler(req, res) {
 
         for (const model of models) {
             try {
+                // Hugging Face Router API - note: no /models/ in path
                 response = await fetch(
-                    `https://router.huggingface.co/models/${model}`,
+                    `https://router.huggingface.co/${model}`,
                     {
                         method: 'POST',
                         headers: {
