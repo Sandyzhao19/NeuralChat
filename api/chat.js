@@ -49,9 +49,9 @@ export default async function handler(req, res) {
 
         for (const model of models) {
             try {
-                // Use OpenAI-compatible chat completions endpoint
+                // Use Hugging Face Router endpoint (no /models/ prefix)
                 response = await fetch(
-                    'https://api-inference.huggingface.co/models/' + model,
+                    'https://router.huggingface.co/' + model,
                     {
                         method: 'POST',
                         headers: {
