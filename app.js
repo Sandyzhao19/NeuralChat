@@ -20,7 +20,7 @@ async function initializeAI() {
         statusDot.classList.add('loading');
         statusText.textContent = 'Loading AI Model...';
         
-        // DistilGPT-2 - Proven to work in browser
+        // DistilGPT-2
         generator = await pipeline(
             'text-generation',
             'Xenova/distilgpt2',
