@@ -33,7 +33,7 @@ export default async function handler(req, res) {
             return res.status(500).json({ error: 'API token not configured' });
         }
 
-        // Use Hugging Face Router API v1 (OpenAI-compatible format)
+        // Use Hugging Face Router API v1 with OpenAI-compatible format
         // Try multiple models in order of preference
         const models = [
             'Qwen/Qwen2.5-7B-Instruct',
@@ -49,9 +49,9 @@ export default async function handler(req, res) {
 
         for (const model of models) {
             try {
-                // Use Hugging Face Router endpoint (no /models/ prefix)
+                // Use OpenAI-compatible chat completions endpoint
                 response = await fetch(
-                    'https://router.huggingface.co/' + model,
+                    'https://api-inference.huggingface.co/models/' + model + '/v1/chat/completions',
                     {
                         method: 'POST',
                         headers: {
@@ -59,18 +59,12 @@ export default async function handler(req, res) {
                             'Content-Type': 'application/json'
                         },
                         body: JSON.stringify({
-                            inputs: prompt,
-                            parameters: {
-                                max_new_tokens: 512,
-                                temperature: 0.7,
-                                top_p: 0.9,
-                                return_full_text: false,
-                                ...(parameters || {})
-                            },
-                            options: {
-                                use_cache: false,
-                                wait_for_model: true
-                            }
+                            messages: [
+                                { role: 'user', content: prompt }
+                            ],
+                            max_tokens: parameters?.max_new_tokens || 512,
+                            temperature: parameters?.temperature || 0.7,
+                            top_p: parameters?.top_p || 0.9
                         })
                     }
                 );
@@ -115,14 +109,26 @@ export default async function handler(req, res) {
             return res.status(response.status).json(data);
         }
 
-        // Add model info to successful response
-        if (Array.isArray(data)) {
-            data[0] = { ...data[0], model: usedModel };
+        // Convert OpenAI format to HF Inference format for compatibility
+        let responseData;
+        if (data.choices && data.choices[0]?.message?.content) {
+            // OpenAI format - convert to HF format
+            responseData = [{
+                generated_text: data.choices[0].message.content,
+                model: usedModel
+            }];
+        } else if (Array.isArray(data)) {
+            // Already in HF format
+            responseData = data;
+            responseData[0] = { ...responseData[0], model: usedModel };
+        } else if (data.generated_text) {
+            // HF format single object
+            responseData = [{ ...data, model: usedModel }];
         } else {
-            data.model = usedModel;
+            responseData = data;
         }
 
-        return res.status(200).json(data);
+        return res.status(200).json(responseData);
 
     } catch (error) {
         console.error('Error:', error);
