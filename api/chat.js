@@ -33,7 +33,7 @@ export default async function handler(req, res) {
             return res.status(500).json({ error: 'API token not configured' });
         }
 
-        // Use Hugging Face Router API v1 with OpenAI-compatible format
+        // Use Hugging Face Router API
         // Try multiple models in order of preference
         const models = [
             'Qwen/Qwen2.5-7B-Instruct',
@@ -49,9 +49,9 @@ export default async function handler(req, res) {
 
         for (const model of models) {
             try {
-                // Use OpenAI-compatible chat completions endpoint
+                // Use Hugging Face Router with standard inference format
                 response = await fetch(
-                    'https://api-inference.huggingface.co/models/' + model + '/v1/chat/completions',
+                    `https://api-inference.huggingface.co/models/${model}`,
                     {
                         method: 'POST',
                         headers: {
@@ -59,12 +59,17 @@ export default async function handler(req, res) {
                             'Content-Type': 'application/json'
                         },
                         body: JSON.stringify({
-                            messages: [
-                                { role: 'user', content: prompt }
-                            ],
-                            max_tokens: parameters?.max_new_tokens || 512,
-                            temperature: parameters?.temperature || 0.7,
-                            top_p: parameters?.top_p || 0.9
+                            inputs: prompt,
+                            parameters: {
+                                max_new_tokens: parameters?.max_new_tokens || 512,
+                                temperature: parameters?.temperature || 0.7,
+                                top_p: parameters?.top_p || 0.9,
+                                return_full_text: false
+                            },
+                            options: {
+                                use_cache: false,
+                                wait_for_model: true
+                            }
                         })
                     }
                 );
@@ -78,7 +83,7 @@ export default async function handler(req, res) {
                     break;
                 }
 
-                // If model is loading (503), wait and retry once
+                // If model is loading (503), use this response
                 if (response.status === 503) {
                     usedModel = model;
                     break;
@@ -109,20 +114,14 @@ export default async function handler(req, res) {
             return res.status(response.status).json(data);
         }
 
-        // Convert OpenAI format to HF Inference format for compatibility
+        // Add model info to response
         let responseData;
-        if (data.choices && data.choices[0]?.message?.content) {
-            // OpenAI format - convert to HF format
-            responseData = [{
-                generated_text: data.choices[0].message.content,
-                model: usedModel
-            }];
-        } else if (Array.isArray(data)) {
-            // Already in HF format
+        if (Array.isArray(data)) {
             responseData = data;
-            responseData[0] = { ...responseData[0], model: usedModel };
+            if (responseData[0]) {
+                responseData[0] = { ...responseData[0], model: usedModel };
+            }
         } else if (data.generated_text) {
-            // HF format single object
             responseData = [{ ...data, model: usedModel }];
         } else {
             responseData = data;
