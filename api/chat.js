@@ -49,9 +49,9 @@ export default async function handler(req, res) {
 
         for (const model of models) {
             try {
-                // Use Hugging Face Router with standard inference format
+                // Use Hugging Face Router as required by the API
                 response = await fetch(
-                    `https://api-inference.huggingface.co/models/${model}`,
+                    `https://router.huggingface.co/${model}`,
                     {
                         method: 'POST',
                         headers: {
