@@ -84,29 +84,62 @@ function removeWelcomeMessage() {
     }
 }
 
+// Render markdown with math support
+function renderMarkdown(text) {
+    // First, render markdown
+    let html = marked.parse(text);
+
+    // Then render inline math $...$ and display math $$...$$
+    // Replace display math first ($$...$$)
+    html = html.replace(/\$\$([\s\S]+?)\$\$/g, (match, math) => {
+        try {
+            return katex.renderToString(math, { displayMode: true, throwOnError: false });
+        } catch (e) {
+            return match;
+        }
+    });
+
+    // Replace inline math ($...$)
+    html = html.replace(/\$([^\$\n]+?)\$/g, (match, math) => {
+        try {
+            return katex.renderToString(math, { displayMode: false, throwOnError: false });
+        } catch (e) {
+            return match;
+        }
+    });
+
+    return html;
+}
+
 // Add message to chat
 function addMessage(sender, text) {
     const messageDiv = document.createElement('div');
     messageDiv.className = `message ${sender}`;
-    
+
     const avatar = document.createElement('div');
     avatar.className = 'message-avatar';
     avatar.textContent = sender === 'user' ? '👤' : '🤖';
-    
+
     const content = document.createElement('div');
     content.className = 'message-content';
-    
+
     const textDiv = document.createElement('div');
     textDiv.className = 'message-text';
-    textDiv.textContent = text;
-    
+
+    // Render markdown and math for bot messages, plain text for user
+    if (sender === 'bot') {
+        textDiv.innerHTML = renderMarkdown(text);
+    } else {
+        textDiv.textContent = text;
+    }
+
     content.appendChild(textDiv);
     messageDiv.appendChild(avatar);
     messageDiv.appendChild(content);
-    
+
     messagesContainer.appendChild(messageDiv);
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
-    
+
     // Add to conversation history
     conversationHistory.push({ role: sender, content: text });
 }
