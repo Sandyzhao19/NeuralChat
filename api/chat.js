@@ -49,9 +49,9 @@ export default async function handler(req, res) {
 
         for (const model of models) {
             try {
-                // Use Hugging Face Router as required by the API
+                // Use Hugging Face Router with OpenAI-compatible chat format
                 response = await fetch(
-                    `https://router.huggingface.co/${model}`,
+                    `https://router.huggingface.co/v1/chat/completions`,
                     {
                         method: 'POST',
                         headers: {
@@ -59,17 +59,14 @@ export default async function handler(req, res) {
                             'Content-Type': 'application/json'
                         },
                         body: JSON.stringify({
-                            inputs: prompt,
-                            parameters: {
-                                max_new_tokens: parameters?.max_new_tokens || 512,
-                                temperature: parameters?.temperature || 0.7,
-                                top_p: parameters?.top_p || 0.9,
-                                return_full_text: false
-                            },
-                            options: {
-                                use_cache: false,
-                                wait_for_model: true
-                            }
+                            model: model,
+                            messages: [
+                                { role: 'user', content: prompt }
+                            ],
+                            max_tokens: parameters?.max_new_tokens || 512,
+                            temperature: parameters?.temperature || 0.7,
+                            top_p: parameters?.top_p || 0.9,
+                            stream: false
                         })
                     }
                 );
@@ -114,9 +111,15 @@ export default async function handler(req, res) {
             return res.status(response.status).json(data);
         }
 
-        // Add model info to response
+        // Convert OpenAI format response to HF Inference format
         let responseData;
-        if (Array.isArray(data)) {
+        if (data.choices && data.choices[0]?.message?.content) {
+            // OpenAI chat completion format - convert to HF format
+            responseData = [{
+                generated_text: data.choices[0].message.content,
+                model: usedModel
+            }];
+        } else if (Array.isArray(data)) {
             responseData = data;
             if (responseData[0]) {
                 responseData[0] = { ...responseData[0], model: usedModel };
